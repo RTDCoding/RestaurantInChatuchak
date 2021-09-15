@@ -1,112 +1,135 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- * @flow strict-local
- */
+import React, { useState, useEffect } from 'react'
+import { View, Text, StyleSheet, ScrollView } from 'react-native'
+import MapView, { Marker } from 'react-native-maps';
+import axios from 'axios';
+import { ListItem, Avatar } from 'react-native-elements'
 
-import React from 'react';
-import type {Node} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+export default function App() {
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+  const [loading, setLoading] = useState(true)
+  const [dataList, setDataList] = useState([])
+  const [error, setError] = useState({})
 
-const Section = ({children, title}): Node => {
-  const isDarkMode = useColorScheme() === 'dark';
+  var mapRef;
+
+  const location = {
+    lat: 13.8267133, 
+    lng: 100.5465866
+  }
+
+  const getRestaurant = async () => {
+
+    const locationStr = location.lat + ',' + location.lng
+    const radius = 20 * 1000
+    const type = 'restaurant'
+    const key = 'AlzaSyBzwsOhJHzOzYUnA3H1mlJpnMn3ROYP3DM'
+
+    const { data } = await axios.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=' + locationStr + '&radius=' + radius + '&type=' + type + '&key=' + key)
+
+    console.log(data.status)
+    if(data.status == 'OK'){
+      setDataList(data.results)
+    } else {
+      setError(data)
+    }
+
+    setLoading(false)
+
+  }
+
+  const setCenterMap = (lat, lng, map) => {
+    mapRef.setCamera({
+      center: {
+          latitude: Number(lat),
+          longitude: Number(lng),
+      },
+      pitch: 0,
+      heading: 0,
+      zoom: 18,
+      altitude: 0,
+  });
+};
+
+  useEffect(() => {
+    getRestaurant()
+  }, [])
+
   return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
+    <View style={{flex: 1, flexDirection: 'column'}}>
+      {
+        !loading && (
+          <>
+            <View style={{flex: 0.6, ...styles.container}}>
+              <MapView
+                ref={(ref) => mapRef = ref}
+                style={styles.map}
+                initialRegion={{
+                  latitude: location.lat,
+                  longitude: location.lng,
+                  latitudeDelta: 0.0922,
+                  longitudeDelta: 0.0421,
+                }}
+                initialCamera={{
+                  center: {
+                    latitude: location.lat, 
+                    longitude: location.lng
+                  }, 
+                  pitch: 0,
+                  heading: 0, 
+                  altitude: 0, 
+                  zoom: 14
+                }}
+              >
+                {
+                  dataList.map((data, index) => (
+                    <Marker key={index}
+                      title={data.name}
+                      coordinate={{
+                        latitude: data.geometry.location.lat, 
+                        longitude: data.geometry.location.lng
+                      }}
+                      image={{uri: data.icon}}
+                    />
+                  ))
+                }
+              </MapView>
+            </View>
+            <View style={{flex: 0.4}}>
+                {
+                  dataList.length > 0 ? (
+                    <ScrollView>
+                    {
+                      dataList.map((data, index) => (
+                        <ListItem key={index} bottomDivider onPress={() => setCenterMap(data.geometry.location.lat, data.geometry.location.lng, mapRef)}>
+                          <Avatar source={{uri: data.icon}} />
+                          <ListItem.Content>
+                            <ListItem.Title>{data.name}</ListItem.Title>
+                            <ListItem.Subtitle>{data.vicinity}</ListItem.Subtitle>
+                          </ListItem.Content>
+                        </ListItem>
+                      ))
+                    }
+                    </ScrollView>
+                  ) : (
+                    <View style={{flex: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                      <Text style={{textAlign: 'center'}}>{error.error_message}</Text>
+                    </View>
+                  )
+                }
+            </View>
+          </>
+        )
+      }
     </View>
-  );
-};
-
-const App: () => Node = () => {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
-
-  return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.js</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+  container: {
+    justifyContent: 'flex-end',
+    alignItems: 'center',
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+  map: {
+    ...StyleSheet.absoluteFillObject,
   },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
-
-export default App;
+ });
